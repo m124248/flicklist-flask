@@ -50,6 +50,22 @@ def get_watched_movies():
     return Movie.query.filter_by(watched=True).all()
 
 # TODO 3: Add "/login" GET and POST routes.
+@app.route("/login", methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        user = User.query.filter_by(email=email).first()
+        if user and user.password == password:
+            session['email'] = email
+            flash("Logged in")
+            return redirect('/')
+        else:
+            flash('User password incorrect, or user does not exist', 'error')
+    else:
+        return render_template('login.html')
+
+
 # TODO 4: Create login template with username and password.
 #         Notice that we've already created a 'login' link in the upper-right corner of the page that'll connect to it.
 
@@ -58,11 +74,29 @@ def register():
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
+        verify = request.form['verify']
+
         if not is_email(email):
             flash('zoiks! "' + email + '" does not seem like an email address')
             return redirect('/register')
+       
         # TODO 1: validate that form value of 'verify' matches password
+        if verify != password:
+            flash('zoiks! "' + verify + '" passwords do not match')
+            return redirect('/register')
+        
         # TODO 2: validate that there is no user with that email already
+        existing_user = User.query.filter_by(email=email).first()
+        if not existing_user:
+            new_user = User(email, password)
+            db.session.add(new_user)
+            db.session.commit()
+            session['email'] = email
+            return redirect('/')
+        else:
+            flash('zoiks! "' + email + '" email already exists!')
+            return redirect('/register')
+
         user = User(email=email, password=password)
         db.session.add(user)
         db.session.commit()
@@ -160,8 +194,9 @@ def index():
 #         It should contain 'register' and 'login'.
 @app.before_request
 def require_login():
-    if not ('user' in session or request.endpoint == 'register'):
-        return redirect("/register")
+    allowed_routes = ['login', 'register']
+    if request.endpoint not in allowed_routes and 'email' not in session:
+        return redirect('/login')
 
 # In a real application, this should be kept secret (i.e. not on github)
 # As a consequence of this secret being public, I think connection snoopers or
